@@ -1,68 +1,57 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>联网猜拳</title>
+  <title>联网猜拳游戏</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: "微软雅黑"; text-align: center; padding: 30px; background: #f0f8ff; }
-    h1 { color: #333; }
-    .btn { margin: 10px; padding: 10px 20px; font-size: 18px; border:none;
-           border-radius:6px; background:#4CAF50; color:white; cursor:pointer; }
-    .btn:disabled { background: #aaa; cursor: default; }
-    #status, #result { margin-top: 20px; font-size: 20px; color: #444; }
+    body { font-family: sans-serif; text-align: center; padding: 30px; }
+    .btn { margin: 10px; padding: 10px 20px; font-size:16px; }
   </style>
 </head>
 <body>
-  <h1>联网猜拳</h1>
-  <p>房间号：<input id="roomId" value="room1" /></p>
-  <button id="joinBtn" class="btn">加入房间</button>
-  <div id="game" style="display:none;">
-    <p id="status">等待另一位玩家...</p>
-    <div id="choices" style="margin-top:20px;">
-      <button class="btn" onclick="play('石头')">石头 ✊</button>
-      <button class="btn" onclick="play('剪刀')">剪刀 ✌</button>
-      <button class="btn" onclick="play('布')">布 🖐</button>
-    </div>
-    <div id="result"></div>
+  <h1>联网猜拳 🖐️</h1>
+  <input id="room" placeholder="输入房间号">
+  <button onclick="join()">加入房间</button>
+  <div id="game" style="display:none; margin-top:20px;">
+    <p id="status"></p>
+    <button class="btn" onclick="play('石头')">石头</button>
+    <button class="btn" onclick="play('剪刀')">剪刀</button>
+    <button class="btn" onclick="play('布')">布</button>
+    <p id="result"></p>
   </div>
 
   <script>
     const socket = io();
-    let myRoom;
+    let roomId = '';
 
-    document.getElementById('joinBtn').onclick = () => {
-      myRoom = document.getElementById('roomId').value.trim();
-      if (!myRoom) return alert('请输入房间号');
-      socket.emit('join', myRoom);
-      document.getElementById('game').style.display = 'block';
-      document.getElementById('joinBtn').disabled = true;
-      document.getElementById('roomId').disabled = true;
-    };
-
-    socket.on('status', count => {
-      document.getElementById('status').innerText =
-        count < 2 ? '等待另一位玩家加入…' : '玩家已就绪，开始出拳！';
-      document.getElementById('choices').style.display = count < 2 ? 'none' : 'block';
-      document.getElementById('result').innerText = '';
+    socket.on('status', num => {
+      document.getElementById('status').innerText = `房间人数：${num}`;
+      document.getElementById('game').style.display = num >= 1 ? 'block' : 'none';
     });
 
-    function play(hand) {
-      document.getElementById('status').innerText = '已出拳：' + hand + '，等待对方…';
-      socket.emit('play', { roomId: myRoom, hand });
-      Array.from(document.querySelectorAll('.btn')).forEach(b => b.disabled = true);
+    socket.on('result', ({ p1, p2, winner }) => {
+      const me = socket.id === socket.rooms[roomId]?.[0] ? 1 : 2;
+      const opp = me === 1 ? 2 : 1;
+      let text = `玩家1：${p1}，玩家2：${p2}，`;
+      if (winner === 'draw') text += '平局';
+      else if ((winner === 'p1' && me === 1) || (winner === 'p2' && me === 2)) text += '你赢了！';
+      else text += '你输了';
+      document.getElementById('result').innerText = text;
+    });
+
+    function join() {
+      roomId = document.getElementById('room').value.trim();
+      if (!roomId) return alert('请输入房间号');
+      socket.emit('join', roomId);
+      document.getElementById('game').style.display = 'block';
     }
 
-    socket.on('result', data => {
-      const { p1, p2, winner } = data;
-      let msg;
-      if (winner === 'draw') msg = `平局！双方都出 ${p1}`;
-      else msg = (winner === 'p1') ? '玩家1 赢了！' : '玩家2 赢了！';
-      msg += `（P1：${p1} vs P2：${p2}）`;
-      document.getElementById('result').innerText = msg;
-      Array.from(document.querySelectorAll('.btn')).forEach(b => b.disabled = false);
-      document.getElementById('status').innerText = '下一局，继续出拳';
-    });
+    function play(hand) {
+      document.getElementById('result').innerText = '';
+      socket.emit('play', { roomId, hand });
+    }
   </script>
 </body>
 </html>
+
