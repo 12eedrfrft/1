@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>联网猜拳</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: "微软雅黑"; text-align: center; padding: 30px; background: #f0f8ff; }
+    h1 { color: #333; }
+    .btn { margin: 10px; padding: 10px 20px; font-size: 18px; border:none;
+           border-radius:6px; background:#4CAF50; color:white; cursor:pointer; }
+    .btn:disabled { background: #aaa; cursor: default; }
+    #status, #result { margin-top: 20px; font-size: 20px; color: #444; }
+  </style>
+</head>
+<body>
+  <h1>联网猜拳</h1>
+  <p>房间号：<input id="roomId" value="room1" /></p>
+  <button id="joinBtn" class="btn">加入房间</button>
+  <div id="game" style="display:none;">
+    <p id="status">等待另一位玩家...</p>
+    <div id="choices" style="margin-top:20px;">
+      <button class="btn" onclick="play('石头')">石头 ✊</button>
+      <button class="btn" onclick="play('剪刀')">剪刀 ✌</button>
+      <button class="btn" onclick="play('布')">布 🖐</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const socket = io();
+    let myRoom;
+
+    document.getElementById('joinBtn').onclick = () => {
+      myRoom = document.getElementById('roomId').value.trim();
+      if (!myRoom) return alert('请输入房间号');
+      socket.emit('join', myRoom);
+      document.getElementById('game').style.display = 'block';
+      document.getElementById('joinBtn').disabled = true;
+      document.getElementById('roomId').disabled = true;
+    };
+
+    socket.on('status', count => {
+      document.getElementById('status').innerText =
+        count < 2 ? '等待另一位玩家加入…' : '玩家已就绪，开始出拳！';
+      document.getElementById('choices').style.display = count < 2 ? 'none' : 'block';
+      document.getElementById('result').innerText = '';
+    });
+
+    function play(hand) {
+      document.getElementById('status').innerText = '已出拳：' + hand + '，等待对方…';
+      socket.emit('play', { roomId: myRoom, hand });
+      Array.from(document.querySelectorAll('.btn')).forEach(b => b.disabled = true);
+    }
+
+    socket.on('result', data => {
+      const { p1, p2, winner } = data;
+      let msg;
+      if (winner === 'draw') msg = `平局！双方都出 ${p1}`;
+      else msg = (winner === 'p1') ? '玩家1 赢了！' : '玩家2 赢了！';
+      msg += `（P1：${p1} vs P2：${p2}）`;
+      document.getElementById('result').innerText = msg;
+      Array.from(document.querySelectorAll('.btn')).forEach(b => b.disabled = false);
+      document.getElementById('status').innerText = '下一局，继续出拳';
+    });
+  </script>
+</body>
+</html>
